@@ -59,7 +59,7 @@
   }
   .fade-up{ animation: fadeUp 0.4s ease forwards; }
 
-  .option-btn{ transition: all .15s ease; }
+  .option-btn{ transition: all .15s ease; touch-action: manipulation; }
   .option-btn:hover:not(:disabled){ transform: translateX(4px); }
 
   .timer-ring-bg{ stroke: rgba(201,162,39,0.18); }
@@ -67,6 +67,13 @@
 
   ::-webkit-scrollbar{ width:8px; }
   ::-webkit-scrollbar-thumb{ background:#C9A227; border-radius:4px; }
+
+  @media (max-width: 640px){
+    body{ padding:12px; align-items:flex-start; }
+    #screen-start, #screen-board, #screen-results{ padding:22px; }
+    #screen-quiz .paper-card{ padding:22px; }
+    .option-btn{ min-height:54px; }
+  }
 
   @media (prefers-reduced-motion: reduce){
     .stamp-anim, .fade-up{ animation: none !important; }
@@ -129,6 +136,7 @@
     </div>
     <p class="text-xs text-navy/40 mb-3">Refreshes automatically every few seconds.</p>
     <ol id="leaderboard-standalone" class="space-y-1 font-mono text-sm"></ol>
+  </div>
 
   <!-- ============ SCREEN: QUIZ ============ -->
   <div id="screen-quiz" class="hidden">
@@ -271,6 +279,7 @@
   let answering = false;
   let eliminated = false;
   let boardPolling = false;
+  let boardPollToken = 0;
 
   const screenStart = document.getElementById('screen-start');
   const screenQuiz = document.getElementById('screen-quiz');
@@ -283,17 +292,21 @@
   btnViewBoard.addEventListener('click', () => {
     screenStart.classList.add('hidden');
     screenBoard.classList.remove('hidden');
-    loadLeaderboard('leaderboard-standalone');
+    boardPolling = true;
+    boardPollToken++;
+    loadLeaderboard('leaderboard-standalone', boardPollToken);
   });
 
   btnBoardBack.addEventListener('click', () => {
     boardPolling = false;
+    boardPollToken++;
     screenBoard.classList.add('hidden');
     screenStart.classList.remove('hidden');
   });
 
   document.getElementById('btn-new-team').addEventListener('click', () => {
     boardPolling = false;
+    boardPollToken++;
     teamInput.value = '';
     membersInput.value = '';
     alreadyDoneError.classList.add('hidden');
@@ -485,12 +498,18 @@
       return;
     }
     try {
-      await fetch(APPS_SCRIPT_URL, {
+      const res = await fetch(APPS_SCRIPT_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids a CORS preflight
         body: JSON.stringify({ team: name, members, correct, score })
       });
-      statusEl.textContent = "✓ Result saved to the Google Sheet.";
+      const data = await res.json();
+      if (!res.ok || data.status !== "ok") {
+        throw new Error(data.message || "Save failed");
+      }
+      statusEl.textContent = data.duplicate
+        ? "⚠ This team already had a saved result."
+        : "✓ Result saved to the Google Sheet.";
     } catch (e) {
       console.error(e);
       statusEl.textContent = "⚠ Could not save result — check the Apps Script URL/deployment.";
@@ -498,9 +517,13 @@
     }
   }
 
-  async function loadLeaderboard(targetId){
+  async function loadLeaderboard(targetId, pollToken){
     targetId = targetId || 'leaderboard';
-    boardPolling = true;
+    if (pollToken === undefined) {
+      boardPolling = true;
+      boardPollToken++;
+      pollToken = boardPollToken;
+    }
     const boardEl = document.getElementById(targetId);
     if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes("YOUR_APPS_SCRIPT")) {
       boardEl.innerHTML = `<li class="text-navy/40">Connect the Google Sheet to show a leaderboard here.</li>`;
@@ -524,7 +547,9 @@
         });
       }
       // Keep refreshing while this screen is still open.
-      if (boardPolling) setTimeout(() => loadLeaderboard(targetId), 5000);
+      if (boardPolling && pollToken === boardPollToken) {
+        setTimeout(() => loadLeaderboard(targetId, pollToken), 5000);
+      }
     } catch (e) {
       console.error(e);
       boardEl.innerHTML = `<li class="text-seal">⚠ Could not load leaderboard.</li>`;
