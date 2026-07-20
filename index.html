@@ -114,7 +114,21 @@
       Begin Inspection →
     </button>
     <p id="start-error" class="text-seal text-sm mt-2 hidden">Enter your team name to begin.</p>
+    <p id="already-done-error" class="text-seal text-sm mt-2 hidden">This team has already completed the inspection. Each team may only attempt it once.</p>
+
+    <button id="btn-view-board" class="w-full mt-3 border border-navy/20 text-navy/70 font-mono text-xs tracking-widest py-2 rounded-sm hover:border-brass hover:text-navy transition">
+      ⚑ VIEW LEADERBOARD
+    </button>
   </div>
+
+  <!-- ============ SCREEN: LEADERBOARD ONLY ============ -->
+  <div id="screen-board" class="hidden paper-card rounded-sm shadow-2xl p-8 stamp-ring fade-up">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-display text-2xl font-700">Leaderboard</h2>
+      <button id="btn-board-back" class="font-mono text-xs tracking-widest text-navy/50 hover:text-brass">← BACK</button>
+    </div>
+    <p class="text-xs text-navy/40 mb-3">Refreshes automatically every few seconds.</p>
+    <ol id="leaderboard-standalone" class="space-y-1 font-mono text-sm"></ol>
 
   <!-- ============ SCREEN: QUIZ ============ -->
   <div id="screen-quiz" class="hidden">
@@ -189,6 +203,10 @@
       <p class="text-xs text-navy/40 mb-2">Refreshes automatically every few seconds.</p>
       <ol id="leaderboard" class="space-y-1 font-mono text-sm"></ol>
     </div>
+
+    <button id="btn-new-team" class="w-full mt-6 border border-navy/20 text-navy/70 font-mono text-xs tracking-widest py-2 rounded-sm hover:border-brass hover:text-navy transition">
+      ⚑ NEXT TEAM
+    </button>
   </div>
 
 </div>
@@ -252,10 +270,37 @@
   let timerInterval = null;
   let answering = false;
   let eliminated = false;
+  let boardPolling = false;
 
   const screenStart = document.getElementById('screen-start');
   const screenQuiz = document.getElementById('screen-quiz');
   const screenResults = document.getElementById('screen-results');
+  const screenBoard = document.getElementById('screen-board');
+
+  const btnViewBoard = document.getElementById('btn-view-board');
+  const btnBoardBack = document.getElementById('btn-board-back');
+
+  btnViewBoard.addEventListener('click', () => {
+    screenStart.classList.add('hidden');
+    screenBoard.classList.remove('hidden');
+    loadLeaderboard('leaderboard-standalone');
+  });
+
+  btnBoardBack.addEventListener('click', () => {
+    boardPolling = false;
+    screenBoard.classList.add('hidden');
+    screenStart.classList.remove('hidden');
+  });
+
+  document.getElementById('btn-new-team').addEventListener('click', () => {
+    boardPolling = false;
+    teamInput.value = '';
+    membersInput.value = '';
+    alreadyDoneError.classList.add('hidden');
+    document.getElementById('save-status').classList.remove('text-seal');
+    screenResults.classList.add('hidden');
+    screenStart.classList.remove('hidden');
+  });
 
   const teamInput = document.getElementById('team-name');
   const membersInput = document.getElementById('team-members');
@@ -273,19 +318,56 @@
 
   const RING_CIRC = 150.8;
 
-  btnStart.addEventListener('click', () => {
+  const alreadyDoneError = document.getElementById('already-done-error');
+
+  btnStart.addEventListener('click', async () => {
     const name = teamInput.value.trim();
+    alreadyDoneError.classList.add('hidden');
+    startError.classList.add('hidden');
+
     if (!name) {
       startError.classList.remove('hidden');
       return;
     }
+
+    btnStart.disabled = true;
+    btnStart.textContent = "Checking team record…";
+
+    const alreadyPlayed = await hasTeamAlreadyPlayed(name);
+
+    if (alreadyPlayed) {
+      alreadyDoneError.classList.remove('hidden');
+      btnStart.disabled = false;
+      btnStart.textContent = "Begin Inspection →";
+      return;
+    }
+
     teamName = name;
     teamMembers = membersInput.value.trim();
-    startError.classList.add('hidden');
+    btnStart.disabled = false;
+    btnStart.textContent = "Begin Inspection →";
     screenStart.classList.add('hidden');
     screenQuiz.classList.remove('hidden');
     startQuiz();
   });
+
+  // Checks the Google Sheet for an existing result under this team name.
+  // Fails "open" (lets them play) only if the check itself errors out,
+  // e.g. Apps Script isn't configured yet — so the page still works
+  // for testing before you've connected the Sheet.
+  async function hasTeamAlreadyPlayed(name){
+    if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes("YOUR_APPS_SCRIPT")) {
+      return false;
+    }
+    try {
+      const res = await fetch(APPS_SCRIPT_URL + "?team=" + encodeURIComponent(name) + "&t=" + Date.now());
+      const data = await res.json();
+      return !!data.exists;
+    } catch (e) {
+      console.error("Team check failed:", e);
+      return false;
+    }
+  }
 
   function startQuiz(){
     currentQ = 0;
@@ -416,30 +498,33 @@
     }
   }
 
-  async function loadLeaderboard(){
-    const boardEl = document.getElementById('leaderboard');
+  async function loadLeaderboard(targetId){
+    targetId = targetId || 'leaderboard';
+    boardPolling = true;
+    const boardEl = document.getElementById(targetId);
     if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes("YOUR_APPS_SCRIPT")) {
       boardEl.innerHTML = `<li class="text-navy/40">Connect the Google Sheet to show a leaderboard here.</li>`;
       return;
     }
     boardEl.innerHTML = `<li class="text-navy/40">Loading…</li>`;
     try {
-      const res = await fetch(APPS_SCRIPT_URL, { method: "GET" });
+      // Cache-bust so we always see the latest sheet data, not a stale cached GET.
+      const res = await fetch(APPS_SCRIPT_URL + "?t=" + Date.now(), { method: "GET" });
       const data = await res.json();
       const rows = (data.results || []);
       if (rows.length === 0) {
         boardEl.innerHTML = `<li class="text-navy/40">No results yet.</li>`;
-        return;
+      } else {
+        boardEl.innerHTML = '';
+        rows.forEach((r, idx) => {
+          const li = document.createElement('li');
+          li.className = "flex justify-between border-b border-navy/10 py-1";
+          li.innerHTML = `<span>${idx+1}. ${r.team}</span><span class="text-brass">${r.score} pts</span>`;
+          boardEl.appendChild(li);
+        });
       }
-      boardEl.innerHTML = '';
-      rows.forEach((r, idx) => {
-        const li = document.createElement('li');
-        li.className = "flex justify-between border-b border-navy/10 py-1";
-        li.innerHTML = `<span>${idx+1}. ${r.team}</span><span class="text-brass">${r.score} pts</span>`;
-        boardEl.appendChild(li);
-      });
-      // Refresh again shortly in case other teams finish while this screen is open.
-      setTimeout(loadLeaderboard, 8000);
+      // Keep refreshing while this screen is still open.
+      if (boardPolling) setTimeout(() => loadLeaderboard(targetId), 5000);
     } catch (e) {
       console.error(e);
       boardEl.innerHTML = `<li class="text-seal">⚠ Could not load leaderboard.</li>`;
