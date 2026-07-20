@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Station 5 — BIS Rapid Inspection Quiz</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          navy: { DEFAULT:'#132043', deep:'#0B1530' },
+          brass:{ DEFAULT:'#C9A227', light:'#E4C458' },
+          paper:'#F6F1E4',
+          seal: '#A93226',
+          ok:   '#2E7D46'
+        },
+        fontFamily: {
+          display: ['"Playfair Display"','serif'],
+          body: ['"Inter"','sans-serif'],
+          mono: ['"IBM Plex Mono"','monospace']
+        }
+      }
+    }
+  }
+</script>
+<style>
+  body{ background:
+    radial-gradient(circle at 20% 10%, rgba(201,162,39,0.08), transparent 40%),
+    radial-gradient(circle at 80% 90%, rgba(201,162,39,0.06), transparent 40%),
+    #0B1530; }
+
+  .paper-card{
+    background: #F6F1E4;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(19,32,67,0.03) 0px, rgba(19,32,67,0.03) 1px, transparent 1px, transparent 28px);
+    border: 1px solid rgba(19,32,67,0.15);
+  }
+
+  .stamp-ring{
+    border: 3px double #C9A227;
+  }
+
+  /* Rubber stamp animation */
+  @keyframes stampDown{
+    0%   { transform: scale(2.6) rotate(-14deg); opacity:0; }
+    55%  { transform: scale(0.92) rotate(-6deg); opacity:1; }
+    70%  { transform: scale(1.08) rotate(-6deg); }
+    100% { transform: scale(1) rotate(-6deg); opacity:1; }
+  }
+  .stamp-anim{ animation: stampDown 0.5s cubic-bezier(.2,.8,.2,1) forwards; }
+
+  @keyframes fadeUp{
+    from{ opacity:0; transform: translateY(10px); }
+    to{ opacity:1; transform: translateY(0); }
+  }
+  .fade-up{ animation: fadeUp 0.4s ease forwards; }
+
+  .option-btn{ transition: all .15s ease; }
+  .option-btn:hover:not(:disabled){ transform: translateX(4px); }
+
+  .timer-ring-bg{ stroke: rgba(201,162,39,0.18); }
+  .timer-ring-fg{ stroke: #C9A227; transition: stroke-dashoffset 1s linear, stroke .3s ease; }
+
+  ::-webkit-scrollbar{ width:8px; }
+  ::-webkit-scrollbar-thumb{ background:#C9A227; border-radius:4px; }
+
+  @media (prefers-reduced-motion: reduce){
+    .stamp-anim, .fade-up{ animation: none !important; }
+  }
+</style>
+</head>
+<body class="min-h-screen font-body text-navy flex items-center justify-center p-4">
+
+<div class="w-full max-w-2xl">
+
+  <!-- Letterhead -->
+  <div class="text-center mb-5 select-none">
+    <p class="font-mono text-brass tracking-[0.3em] text-xs mb-1">STATION 05 · FIELD CERTIFICATION</p>
+    <h1 class="font-display text-3xl md:text-4xl text-paper font-800 tracking-tight">BIS Rapid Inspection Quiz</h1>
+    <p class="text-paper/50 text-sm mt-1 font-mono">Bureau of Indian Standards — Treasure Hunt Division</p>
+  </div>
+
+  <!-- ============ SCREEN: START ============ -->
+  <div id="screen-start" class="paper-card rounded-sm shadow-2xl p-8 stamp-ring fade-up">
+    <div class="flex items-start justify-between mb-6">
+      <div>
+        <p class="font-mono text-xs text-navy/50 tracking-widest">CASE FILE</p>
+        <h2 class="font-display text-2xl font-700">Inspector Assignment</h2>
+      </div>
+      <div class="w-16 h-16 rounded-full border-2 border-navy/20 flex items-center justify-center text-brass font-display text-xl">ISI</div>
+    </div>
+
+    <p class="text-navy/80 leading-relaxed mb-6">
+      A customer has asked you to verify products and standards before they reach the market.
+      You have <span class="font-semibold">5 questions</span> and <span class="font-semibold">3 minutes</span> to
+      complete your inspection. Correct calls earn <span class="font-semibold">4 marks</span> each —
+      but <span class="font-semibold text-seal">one wrong call ends your inspection immediately.</span>
+    </p>
+
+    <label class="block font-mono text-xs tracking-widest text-navy/50 mb-2">TEAM NAME</label>
+    <input id="team-name" type="text" placeholder="e.g. Team Falcon"
+      class="w-full bg-transparent border-b-2 border-navy/30 focus:border-brass outline-none py-2 mb-6 font-display text-xl placeholder:text-navy/30 placeholder:font-body placeholder:text-base" />
+
+    <label class="block font-mono text-xs tracking-widest text-navy/50 mb-2">TEAM MEMBERS <span class="normal-case text-navy/30">(for verification)</span></label>
+    <input id="team-members" type="text" placeholder="e.g. Aarav, Diya, Kabir, Meera, Rohan"
+      class="w-full bg-transparent border-b-2 border-navy/30 focus:border-brass outline-none py-2 mb-6 font-body text-base placeholder:text-navy/30" />
+
+    <button id="btn-start"
+      class="w-full bg-navy hover:bg-navy-deep text-paper font-semibold py-3 rounded-sm tracking-wide transition disabled:opacity-40 disabled:cursor-not-allowed">
+      Begin Inspection →
+    </button>
+    <p id="start-error" class="text-seal text-sm mt-2 hidden">Enter your team name to begin.</p>
+  </div>
+
+  <!-- ============ SCREEN: QUIZ ============ -->
+  <div id="screen-quiz" class="hidden">
+    <!-- Timer + progress -->
+    <div class="flex items-center justify-between mb-4 px-1">
+      <div class="flex items-center gap-3">
+        <svg width="56" height="56" viewBox="0 0 56 56" class="-rotate-90">
+          <circle cx="28" cy="28" r="24" fill="none" stroke-width="5" class="timer-ring-bg"/>
+          <circle id="timer-ring" cx="28" cy="28" r="24" fill="none" stroke-width="5" stroke-linecap="round"
+            class="timer-ring-fg" stroke-dasharray="150.8" stroke-dashoffset="0"/>
+        </svg>
+        <div>
+          <p id="timer-text" class="font-mono text-2xl text-paper leading-none">3:00</p>
+          <p class="text-paper/40 text-xs font-mono tracking-widest">TIME LEFT</p>
+        </div>
+      </div>
+      <div class="text-right">
+        <p id="q-progress" class="font-mono text-paper text-lg">Q1 / 5</p>
+        <p class="text-paper/40 text-xs font-mono tracking-widest">FILE PROGRESS</p>
+      </div>
+    </div>
+
+    <!-- Question Card -->
+    <div class="paper-card rounded-sm shadow-2xl p-8 stamp-ring relative overflow-hidden">
+      <p class="font-mono text-xs text-navy/50 tracking-widest mb-3">INSPECTION ITEM</p>
+      <h3 id="q-text" class="font-display text-xl md:text-2xl font-700 leading-snug mb-6"></h3>
+
+      <div id="q-options" class="space-y-3"></div>
+
+      <!-- Stamp overlay -->
+      <div id="stamp-overlay" class="hidden absolute inset-0 bg-paper/90 flex items-center justify-center">
+        <div id="stamp-mark" class="stamp-anim border-4 rounded-md px-8 py-3 font-display text-3xl font-800 tracking-widest rotate-[-6deg]"></div>
+      </div>
+    </div>
+
+    <!-- Hint card -->
+    <div id="hint-card" class="hidden mt-4 paper-card rounded-sm p-5 border-l-4 border-brass fade-up">
+      <p class="font-mono text-xs text-brass tracking-widest mb-2">⚑ HINT CARD UNLOCKED</p>
+      <ul class="text-sm text-navy/80 space-y-1 list-disc list-inside">
+        <li>Think about the official certification marks used in India.</li>
+        <li><span class="font-semibold">ISI</span> → Industrial Products &nbsp;|&nbsp; <span class="font-semibold">Hallmark</span> → Gold Jewellery</li>
+        <li>Genuine hallmarked jewellery carries a BIS Logo, a Purity Mark (e.g. 22K916), and an HUID.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ============ SCREEN: RESULTS ============ -->
+  <div id="screen-results" class="hidden paper-card rounded-sm shadow-2xl p-8 stamp-ring fade-up">
+    <div class="text-center mb-6">
+      <div id="result-stamp" class="inline-block border-4 rounded-md px-6 py-2 font-display text-2xl font-800 tracking-widest rotate-[-4deg] mb-3"></div>
+      <p class="font-mono text-xs text-navy/50 tracking-widest">CERTIFICATE OF COMPLETION</p>
+      <h2 id="result-team" class="font-display text-2xl font-700 mt-1"></h2>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 mb-6">
+      <div class="border border-navy/15 rounded-sm p-4 text-center">
+        <p class="font-mono text-3xl">
+          <span id="result-correct">0</span><span class="text-navy/40">/5</span>
+        </p>
+        <p class="text-xs font-mono tracking-widest text-navy/50 mt-1">CORRECT</p>
+      </div>
+      <div class="border border-navy/15 rounded-sm p-4 text-center">
+        <p class="font-mono text-3xl text-brass"><span id="result-score">0</span></p>
+        <p class="text-xs font-mono tracking-widest text-navy/50 mt-1">MARKS / 20</p>
+      </div>
+    </div>
+
+    <p id="save-status" class="text-center text-sm font-mono text-navy/50 mb-6">Saving result…</p>
+
+    <div>
+      <p class="font-mono text-xs tracking-widest text-navy/50 mb-2">⚑ LEADERBOARD — TOP TEAMS</p>
+      <p class="text-xs text-navy/40 mb-2">Refreshes automatically every few seconds.</p>
+      <ol id="leaderboard" class="space-y-1 font-mono text-sm"></ol>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ---------------------------------------------------------------
+  // GOOGLE SHEETS SETUP
+  // 1. Create a Google Sheet with a tab named "Results" and headers:
+  //    Timestamp | Team | Members | Correct | Score
+  // 2. Extensions → Apps Script → paste in the apps-script-code.gs file
+  //    provided alongside this page.
+  // 3. Deploy → New deployment → Web app → Execute as Me, Access: Anyone.
+  // 4. Paste the deployment URL below.
+  // ---------------------------------------------------------------
+  const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw30Zpo63Lbz0Xrnj8AwRijXGJeXRdO0StoyJfh47CwMDgXhXtZ961IxHP1-Q1BO__wfg/exec";
+
+  // ---------------------------------------------------------------
+  // QUIZ DATA
+  // ---------------------------------------------------------------
+  const QUESTIONS = [
+    {
+      q: "Which certification mark is generally found on industrial products in India?",
+      options: ["AGMARK", "FSSAI", "ISI Mark", "Hallmark"],
+      correct: 2
+    },
+    {
+      q: "Which of the following is an essential part of a genuine BIS Hallmarked gold jewellery?",
+      options: ["Manufacturing Date", "HUID", "Price Tag", "GST Number"],
+      correct: 1
+    },
+    {
+      q: "Which product should normally be checked for an ISI certification before purchase?",
+      options: ["Helmet", "Pressure Cooker", "Electrical Switch", "All of the Above"],
+      correct: 3
+    },
+    {
+      q: "What does BIS stand for?",
+      options: ["Bureau of Industrial Safety", "Bureau of Indian Standards", "Board of Indian Safety", "Bureau of Inspection Services"],
+      correct: 1
+    },
+    {
+      q: "A customer is buying a 22K gold ring. Which combination confirms it is properly hallmarked?",
+      options: [
+        "BIS Logo + 22K916 + HUID",
+        "BIS Logo + Price Tag + QR Code",
+        "Hallmark Sticker + GST Bill + Shop Logo",
+        "Purity Number + Manufacturer Name + Barcode"
+      ],
+      correct: 0
+    }
+  ];
+
+  const TOTAL_TIME = 180; // seconds
+  const HINT_AFTER = 120; // seconds elapsed
+
+  let teamName = "";
+  let teamMembers = "";
+  let currentQ = 0;
+  let correctCount = 0;
+  let timeLeft = TOTAL_TIME;
+  let timerInterval = null;
+  let answering = false;
+  let eliminated = false;
+
+  const screenStart = document.getElementById('screen-start');
+  const screenQuiz = document.getElementById('screen-quiz');
+  const screenResults = document.getElementById('screen-results');
+
+  const teamInput = document.getElementById('team-name');
+  const membersInput = document.getElementById('team-members');
+  const btnStart = document.getElementById('btn-start');
+  const startError = document.getElementById('start-error');
+
+  const timerText = document.getElementById('timer-text');
+  const timerRing = document.getElementById('timer-ring');
+  const qProgress = document.getElementById('q-progress');
+  const qText = document.getElementById('q-text');
+  const qOptions = document.getElementById('q-options');
+  const stampOverlay = document.getElementById('stamp-overlay');
+  const stampMark = document.getElementById('stamp-mark');
+  const hintCard = document.getElementById('hint-card');
+
+  const RING_CIRC = 150.8;
+
+  btnStart.addEventListener('click', () => {
+    const name = teamInput.value.trim();
+    if (!name) {
+      startError.classList.remove('hidden');
+      return;
+    }
+    teamName = name;
+    teamMembers = membersInput.value.trim();
+    startError.classList.add('hidden');
+    screenStart.classList.add('hidden');
+    screenQuiz.classList.remove('hidden');
+    startQuiz();
+  });
+
+  function startQuiz(){
+    currentQ = 0;
+    correctCount = 0;
+    timeLeft = TOTAL_TIME;
+    eliminated = false;
+    renderQuestion();
+    timerInterval = setInterval(tick, 1000);
+  }
+
+  function tick(){
+    timeLeft--;
+    updateTimerUI();
+    if (timeLeft <= (TOTAL_TIME - HINT_AFTER)) {
+      hintCard.classList.remove('hidden');
+    }
+    if (timeLeft <= 0){
+      clearInterval(timerInterval);
+      finishQuiz();
+    }
+  }
+
+  function updateTimerUI(){
+    const m = Math.floor(Math.max(timeLeft,0) / 60);
+    const s = Math.max(timeLeft,0) % 60;
+    timerText.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+    const offset = RING_CIRC * (1 - Math.max(timeLeft,0)/TOTAL_TIME);
+    timerRing.setAttribute('stroke-dashoffset', offset);
+    if (timeLeft <= 30) {
+      timerRing.style.stroke = '#A93226';
+    }
+  }
+
+  function renderQuestion(){
+    answering = false;
+    stampOverlay.classList.add('hidden');
+    const item = QUESTIONS[currentQ];
+    qProgress.textContent = `Q${currentQ+1} / ${QUESTIONS.length}`;
+    qText.textContent = item.q;
+    qOptions.innerHTML = '';
+    const letters = ['A','B','C','D'];
+    item.options.forEach((opt, i) => {
+      const btn = document.createElement('button');
+      btn.className = "option-btn w-full text-left flex items-center gap-3 border border-navy/20 rounded-sm px-4 py-3 hover:border-brass hover:bg-brass/5";
+      btn.innerHTML = `<span class="font-mono text-brass font-semibold">${letters[i]}</span><span>${opt}</span>`;
+      btn.addEventListener('click', () => selectAnswer(i, btn));
+      qOptions.appendChild(btn);
+    });
+  }
+
+  function selectAnswer(i, btnEl){
+    if (answering) return;
+    answering = true;
+
+    const item = QUESTIONS[currentQ];
+    const isCorrect = i === item.correct;
+    if (isCorrect) correctCount++;
+
+    // disable all buttons, highlight
+    Array.from(qOptions.children).forEach((b, idx) => {
+      b.disabled = true;
+      if (idx === item.correct) b.classList.add('border-ok','bg-ok/10');
+      if (idx === i && !isCorrect) b.classList.add('border-seal','bg-seal/10');
+    });
+
+    // stamp animation
+    stampMark.textContent = isCorrect ? "VERIFIED" : "REJECTED — ELIMINATED";
+    stampMark.className = "stamp-anim border-4 rounded-md px-8 py-3 font-display text-3xl font-800 tracking-widest rotate-[-6deg] " +
+      (isCorrect ? "border-ok text-ok" : "border-seal text-seal");
+    stampOverlay.classList.remove('hidden');
+
+    if (!isCorrect) {
+      // One wrong answer ends the inspection immediately.
+      eliminated = true;
+      clearInterval(timerInterval);
+      setTimeout(finishQuiz, 1200);
+      return;
+    }
+
+    setTimeout(() => {
+      currentQ++;
+      if (currentQ < QUESTIONS.length) {
+        renderQuestion();
+      } else {
+        clearInterval(timerInterval);
+        finishQuiz();
+      }
+    }, 900);
+  }
+
+  function finishQuiz(){
+    screenQuiz.classList.add('hidden');
+    screenResults.classList.remove('hidden');
+
+    const score = correctCount * 4;
+    document.getElementById('result-team').textContent = teamName;
+    document.getElementById('result-correct').textContent = correctCount;
+    document.getElementById('result-score').textContent = score;
+
+    const stamp = document.getElementById('result-stamp');
+    const passed = !eliminated && correctCount === QUESTIONS.length;
+    stamp.textContent = eliminated ? "ELIMINATED" : (passed ? "INSPECTION PASSED" : "TIME UP");
+    stamp.className = "inline-block border-4 rounded-md px-6 py-2 font-display text-2xl font-800 tracking-widest rotate-[-4deg] mb-3 " +
+      (passed ? "border-ok text-ok" : "border-seal text-seal");
+
+    saveResult(teamName, teamMembers, correctCount, score);
+    loadLeaderboard();
+  }
+
+  async function saveResult(name, members, correct, score){
+    const statusEl = document.getElementById('save-status');
+    if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes("YOUR_APPS_SCRIPT")) {
+      statusEl.textContent = "⚠ Google Sheet not connected — result not saved. See comments in the code.";
+      statusEl.classList.add('text-seal');
+      return;
+    }
+    try {
+      await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids a CORS preflight
+        body: JSON.stringify({ team: name, members, correct, score })
+      });
+      statusEl.textContent = "✓ Result saved to the Google Sheet.";
+    } catch (e) {
+      console.error(e);
+      statusEl.textContent = "⚠ Could not save result — check the Apps Script URL/deployment.";
+      statusEl.classList.add('text-seal');
+    }
+  }
+
+  async function loadLeaderboard(){
+    const boardEl = document.getElementById('leaderboard');
+    if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes("YOUR_APPS_SCRIPT")) {
+      boardEl.innerHTML = `<li class="text-navy/40">Connect the Google Sheet to show a leaderboard here.</li>`;
+      return;
+    }
+    boardEl.innerHTML = `<li class="text-navy/40">Loading…</li>`;
+    try {
+      const res = await fetch(APPS_SCRIPT_URL, { method: "GET" });
+      const data = await res.json();
+      const rows = (data.results || []);
+      if (rows.length === 0) {
+        boardEl.innerHTML = `<li class="text-navy/40">No results yet.</li>`;
+        return;
+      }
+      boardEl.innerHTML = '';
+      rows.forEach((r, idx) => {
+        const li = document.createElement('li');
+        li.className = "flex justify-between border-b border-navy/10 py-1";
+        li.innerHTML = `<span>${idx+1}. ${r.team}</span><span class="text-brass">${r.score} pts</span>`;
+        boardEl.appendChild(li);
+      });
+      // Refresh again shortly in case other teams finish while this screen is open.
+      setTimeout(loadLeaderboard, 8000);
+    } catch (e) {
+      console.error(e);
+      boardEl.innerHTML = `<li class="text-seal">⚠ Could not load leaderboard.</li>`;
+    }
+  }
+
+  updateTimerUI();
+</script>
+</body>
+</html>
