@@ -162,7 +162,9 @@
     <!-- Question Card -->
     <div class="paper-card rounded-sm shadow-2xl p-8 stamp-ring relative overflow-hidden">
       <p class="font-mono text-xs text-navy/50 tracking-widest mb-3">INSPECTION ITEM</p>
-      <h3 id="q-text" class="font-display text-xl md:text-2xl font-700 leading-snug mb-6"></h3>
+      <h3 id="q-text" class="font-display text-xl md:text-2xl font-700 leading-snug mb-4"></h3>
+
+      <div id="q-image" class="hidden mb-5 flex justify-center"></div>
 
       <div id="q-options" class="space-y-3"></div>
 
@@ -177,7 +179,7 @@
       <p class="font-mono text-xs text-brass tracking-widest mb-2">⚑ HINT CARD UNLOCKED</p>
       <ul class="text-sm text-navy/80 space-y-1 list-disc list-inside">
         <li>Think about the official certification marks used in India.</li>
-        <li><span class="font-semibold">ISI</span> → Industrial Products &nbsp;|&nbsp; <span class="font-semibold">Hallmark</span> → Gold Jewellery</li>
+        <li><span class="font-semibold">ISI</span> → Industrial Products &nbsp;|&nbsp; <span class="font-semibold">Hallmark</span> → Gold Jewellery &nbsp;|&nbsp; <span class="font-semibold">CRS</span> → Electronics &amp; IT Products</li>
         <li>Genuine hallmarked jewellery carries a BIS Logo, a Purity Mark (e.g. 22K916), and an HUID.</li>
       </ul>
     </div>
@@ -232,44 +234,103 @@
   const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw30Zpo63Lbz0Xrnj8AwRijXGJeXRdO0StoyJfh47CwMDgXhXtZ961IxHP1-Q1BO__wfg/exec";
 
   // ---------------------------------------------------------------
-  // QUIZ DATA
+  // QUESTION BANK
+  // 8 general questions + 2 logo-identification questions.
+  // Each team draws 4 random general + 1 random logo question (5 total),
+  // shuffled into a random order.
   // ---------------------------------------------------------------
-  const QUESTIONS = [
-    {
-      q: "Which certification mark is generally found on industrial products in India?",
-      options: ["AGMARK", "FSSAI", "ISI Mark", "Hallmark"],
-      correct: 2
-    },
-    {
-      q: "Which of the following is an essential part of a genuine BIS Hallmarked gold jewellery?",
-      options: ["Manufacturing Date", "HUID", "Price Tag", "GST Number"],
-      correct: 1
-    },
-    {
-      q: "Which product should normally be checked for an ISI certification before purchase?",
-      options: ["Helmet", "Pressure Cooker", "Electrical Switch", "All of the Above"],
-      correct: 3
-    },
-    {
-      q: "What does BIS stand for?",
-      options: ["Bureau of Industrial Safety", "Bureau of Indian Standards", "Board of Indian Safety", "Bureau of Inspection Services"],
-      correct: 1
-    },
-    {
-      q: "A customer is buying a 22K gold ring. Which combination confirms it is properly hallmarked?",
-      options: [
-        "BIS Logo + 22K916 + HUID",
-        "BIS Logo + Price Tag + QR Code",
-        "Hallmark Sticker + GST Bill + Shop Logo",
-        "Purity Number + Manufacturer Name + Barcode"
-      ],
-      correct: 0
+
+  // Simple illustrative renderings of the marks (not exact reproductions
+  // of the official artwork) used for the logo-identification questions.
+  const ISI_MARK_SVG = `https://upload.wikimedia.org/wikipedia/commons/e/e8/Isi_mark.svg`;
+
+  const CRS_MARK_SVG = `https://upload.wikimedia.org/wikipedia/commons/4/4b/Logo_Compulsory_Registratio.svg`;
+
+  const QUESTION_BANK = {
+    general: [
+      {
+        q: "Which certification mark is generally found on industrial products in India?",
+        options: ["AGMARK", "FSSAI", "ISI Mark", "Hallmark"],
+        correct: 2
+      },
+      {
+        q: "Which of the following is an essential part of a genuine BIS Hallmarked gold jewellery?",
+        options: ["Manufacturing Date", "HUID", "Price Tag", "GST Number"],
+        correct: 1
+      },
+      {
+        q: "Which product should normally be checked for an ISI certification before purchase?",
+        options: ["Helmet", "Pressure Cooker", "Electrical Switch", "All of the Above"],
+        correct: 3
+      },
+      {
+        q: "What does BIS stand for?",
+        options: ["Bureau of Industrial Safety", "Bureau of Indian Standards", "Board of Indian Safety", "Bureau of Inspection Services"],
+        correct: 1
+      },
+      {
+        q: "A customer is buying a 22K gold ring. Which combination confirms it is properly hallmarked?",
+        options: [
+          "BIS Logo + 22K916 + HUID",
+          "BIS Logo + Price Tag + QR Code",
+          "Hallmark Sticker + GST Bill + Shop Logo",
+          "Purity Number + Manufacturer Name + Barcode"
+        ],
+        correct: 0
+      },
+      {
+        q: "What does CRS stand for in the context of BIS?",
+        options: ["Central Registration System", "Compulsory Registration Scheme", "Certified Retail Standard", "Consumer Rights Scheme"],
+        correct: 1
+      },
+      {
+        q: "The CRS scheme mainly mandates registration for which category of products?",
+        options: ["Electronics and IT products", "Agricultural produce", "Textiles", "Furniture"],
+        correct: 0
+      },
+      {
+        q: "What is the primary purpose of BIS certification?",
+        options: ["To collect tax on products", "To ensure quality and safety standards", "To fix product prices", "To promote imported goods"],
+        correct: 1
+      }
+    ],
+    logo: [
+      {
+        q: "Identify the certification mark shown below.",
+        image: ISI_MARK_SVG,
+        options: ["CRS Mark", "Hallmark", "ISI Mark", "AGMARK"],
+        correct: 2
+      },
+      {
+        q: "Identify the certification mark shown below.",
+        image: CRS_MARK_SVG,
+        options: ["ISI Mark", "Hallmark", "AGMARK", "CRS Mark"],
+        correct: 3
+      }
+    ]
+  };
+
+  function shuffle(arr){
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
     }
-  ];
+    return a;
+  }
+
+  // Draws 4 random general questions + 1 random logo question,
+  // then shuffles the combined set of 5 into a random order.
+  function pickQuestions(){
+    const generalPick = shuffle(QUESTION_BANK.general).slice(0, 4);
+    const logoPick = shuffle(QUESTION_BANK.logo).slice(0, 1);
+    return shuffle([...generalPick, ...logoPick]);
+  }
 
   const TOTAL_TIME = 180; // seconds
   const HINT_AFTER = 120; // seconds elapsed
 
+  let QUESTIONS = [];
   let teamName = "";
   let teamMembers = "";
   let currentQ = 0;
@@ -324,6 +385,7 @@
   const timerRing = document.getElementById('timer-ring');
   const qProgress = document.getElementById('q-progress');
   const qText = document.getElementById('q-text');
+  const qImage = document.getElementById('q-image');
   const qOptions = document.getElementById('q-options');
   const stampOverlay = document.getElementById('stamp-overlay');
   const stampMark = document.getElementById('stamp-mark');
@@ -383,6 +445,7 @@
   }
 
   function startQuiz(){
+    QUESTIONS = pickQuestions();
     currentQ = 0;
     correctCount = 0;
     timeLeft = TOTAL_TIME;
@@ -420,6 +483,16 @@
     const item = QUESTIONS[currentQ];
     qProgress.textContent = `Q${currentQ+1} / ${QUESTIONS.length}`;
     qText.textContent = item.q;
+
+    if (item.image) {
+      qImage.innerHTML = `<img src="${item.image}" alt="Certification mark to identify"
+        class="max-h-40 border border-navy/15 rounded-sm bg-white p-3" />`;
+      qImage.classList.remove('hidden');
+    } else {
+      qImage.innerHTML = '';
+      qImage.classList.add('hidden');
+    }
+
     qOptions.innerHTML = '';
     const letters = ['A','B','C','D'];
     item.options.forEach((opt, i) => {
